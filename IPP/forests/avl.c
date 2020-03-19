@@ -197,14 +197,14 @@ void removeKey(avl_t **avl, const char *key) {
                 node->maxLeft = 0;
 
                 if (node->left != NULL) {
-                    node->maxLeft = max(node->left->maxLeft, node->left->maxRight) + 1;
+                    node->maxLeft = max(node->left->maxLeft, node->left->maxRight)+1;
                 }
             } else {
                 removeKey(&(node->right), key);
                 node->maxRight = 0;
 
                 if (node->right != NULL) {
-                    node->maxRight = max(node->right->maxLeft, node->right->maxRight) + 1;
+                    node->maxRight = max(node->right->maxLeft, node->right->maxRight)+1;
                 }
             }
             fixAvl(avl);
