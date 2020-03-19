@@ -1,12 +1,12 @@
 CC = gcc
 CFLAGS = -Wall -Wextra
-LDFLAGS =
+LDFLAGS = -O2
 
 .PHONY: all clean
 
-all: main
+all: forests
 
-main: main.o avl.o
+forests: main.o avl.o
 	$(CC) $(LDFLAGS) -o $@ $^
 
 avl.o: avl.c avl.h
@@ -16,4 +16,4 @@ main.o: main.c avl.h
 	$(CC) $(CFLAGS) -c $<
 
 clean:
-	rm -f *.o main
+	rm -f *.o forests

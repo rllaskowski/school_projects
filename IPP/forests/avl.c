@@ -1,6 +1,7 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 #include "avl.h"
 
 typedef struct avl {
@@ -8,8 +9,8 @@ typedef struct avl {
     struct avl *right;
     size_t maxLeft;
     size_t maxRight;
-    void *key;
-    void *value;
+    char *key;
+    struct avl *value;
 } avl_t;
 
 int max(int a, int b) {
@@ -19,11 +20,11 @@ int max(int a, int b) {
     return b;
 }
 
-avl_t * createAvl(void *key, void *value) {
+static avl_t * createAvl(const char *key, avl_t *value) {
     avl_t *newNode = malloc(sizeof(*newNode));
 
     if (newNode) {
-        newNode->key = key;
+        newNode->key = strdup(key);
         newNode->value = value;
         newNode->left = NULL;
         newNode->right = NULL;
@@ -33,7 +34,7 @@ avl_t * createAvl(void *key, void *value) {
     return newNode;
 }
 
-void leftRotate(avl_t **avl) {
+static void leftRotate(avl_t **avl) {
     avl_t *node = *avl;
     avl_t *rightLeft = (*avl)->right->left;
 
@@ -45,7 +46,7 @@ void leftRotate(avl_t **avl) {
     (*avl)->maxLeft = max(node->maxLeft, node->maxRight)+1;
 }
 
-void rightRotate(avl_t **avl) {
+static void rightRotate(avl_t **avl) {
     avl_t *node = *avl;
     avl_t *leftRightNode = (*avl)->left->right;
 
@@ -57,17 +58,17 @@ void rightRotate(avl_t **avl) {
     (*avl)->maxRight = max(node->maxLeft, node->maxRight)+1;
 }
 
-void leftRightRotate(avl_t **avl) {
+static void leftRightRotate(avl_t **avl) {
     leftRotate(&((*avl)->left));
     rightRotate(avl);
 }
 
-void rightLeftRotate(avl_t **avl) {
+static void rightLeftRotate(avl_t **avl) {
     rightRotate(&((*avl)->right));
     leftRotate(avl);
 }
 
-void fixAvl(avl_t **avl) {
+static void fixAvl(avl_t **avl) {
     avl_t *node = *avl;
     
     if (node->maxLeft > node->maxRight+1) {
@@ -85,20 +86,20 @@ void fixAvl(avl_t **avl) {
     }
 }
 
-avl_t * addKey(avl_t **avl, void* key, int (*cmpFun)(void *, void *)) {
+avl_t * addKey(avl_t **avl, const char* key) {
     avl_t *node = *avl;
     avl_t *result = NULL;
 
     if (node != NULL) {
-        int cmp = cmpFun(key, node->key);
+        int cmp = strcmp(key, node->key);
 
         if (cmp == 0) {
             result = node;
         } else if (cmp < 0) {
-            result = addKey(&node->left, key, cmpFun);
+            result = addKey(&node->left, key);
             node->maxLeft = max(node->left->maxLeft, node->left->maxRight)+1;
         } else {
-            result = addKey(&node->right, key, cmpFun);
+            result = addKey(&node->right, key);
             node->maxRight = max(node->right->maxLeft, node->right->maxRight)+1;
         }
 
@@ -110,35 +111,29 @@ avl_t * addKey(avl_t **avl, void* key, int (*cmpFun)(void *, void *)) {
     return result;
 }
 
-avl_t * findKey(avl_t *avl, void *key, int (*cmpFun)(void *, void *)) {
+avl_t * findKey(avl_t *avl, const char *key) {
     if (avl != NULL) {
-        int cmp = cmpFun(avl->key, key);
+        int cmp = strcmp(key, avl->key);
 
         if (cmp == 0) {
             return avl;
-        } else if (cmp < -1) {
-            return findKey(avl->left, key, cmpFun);
+        } else if (cmp < 0) {
+            return findKey(avl->left, key);
         } else {
-            return findKey(avl->right, key, cmpFun);
+            return findKey(avl->right, key);
         }
     }
     return NULL;
 }
 
-void setValue(avl_t *avl, void *value) {
-    if (avl != NULL) {
-        avl->value = value;
-    }
-}
-
-void * getValue(avl_t *node) {
+avl_t ** getValue(avl_t *node) {
     if (node != NULL) {
-        return node->value;
+        return &node->value;
     }
     return NULL;
 }
 
-void * getKey(avl_t *node) {
+const char * getKey(avl_t *node) {
     if (node != NULL) {
         return node->key;
     }
@@ -159,19 +154,70 @@ avl_t * getRight(avl_t *node) {
     return NULL;
 }
 
-void freeAvl(avl_t *avl, void (*freeKeyFun)(void *), void (*freeValueFun)(void *)) {
+static avl_t * findMin(avl_t *avl) {
     if (avl != NULL) {
-        freeAvl(avl->left, freeKeyFun, freeValueFun);
-        freeAvl(avl->right, freeKeyFun, freeValueFun);
-
-        if (freeKeyFun != NULL) {
-            freeKeyFun(avl->key);
+        if (avl->left == NULL) {
+            return avl;
+        } else {
+            return findMin(avl->left);
         }
+    }
+    return NULL;
+}
 
-        if (freeValueFun != NULL) {
-            freeValueFun(avl->value);
+void removeKey(avl_t **avl, const char *key) {
+    if (avl != NULL && *avl != NULL) {
+        avl_t *node = *avl;
+
+        int cmp = strcmp(key, node->key);
+
+        if (cmp == 0) {
+            freeAvl(node->value);
+            node->value = NULL;
+            free(node->key);
+
+            if (node->left == NULL) {
+                *avl = node->right;
+                free(node);
+
+            } else if (node->right == NULL) {
+                *avl = node->left;
+                free(node);
+            } else {
+                avl_t *minNode = findMin(node->right);
+                node->key = strdup(minNode->key);
+                node->value = minNode->value;
+                minNode->value =  NULL;
+
+                removeKey(&node->right, minNode->key);
+            }
+        } else {
+            if (cmp < 0) {
+                removeKey(&(node->left), key);
+                node->maxLeft = 0;
+
+                if (node->left != NULL) {
+                    node->maxLeft = max(node->left->maxLeft, node->left->maxRight) + 1;
+                }
+            } else {
+                removeKey(&(node->right), key);
+                node->maxRight = 0;
+
+                if (node->right != NULL) {
+                    node->maxRight = max(node->right->maxLeft, node->right->maxRight) + 1;
+                }
+            }
+            fixAvl(avl);
         }
+    }
+}
 
+void freeAvl(avl_t *avl) {
+    if (avl != NULL) {
+        freeAvl(avl->left);
+        freeAvl(avl->right);
+        freeAvl(avl->value);
+        free(avl->key);
         free(avl);
     }
 }

@@ -1,0 +1,19 @@
+ADD Las_Palmas
+ADD Las_Vegas
+ADD Czarnolas buk sikorka
+ADD Czarnolas brzoza
+ADD Czarnolas
+ADD Czarnolas buk pierzaczek
+ADD Las_Palmas spruce wasp
+ADD Las_Palmas spruce wasp
+ADD Las_Palmas fir wasp
+ADD Las_Palmas spruce owl
+PRINT
+CHECK Las_Kabacki
+CHECK * * wasp
+CHECK Las_Vegas * pierzaczek
+DEL Czarnolas buk sikorka
+DEL Las_Palmas
+PRINT Las_Palmas
+CHECK Czarnolas buk pierzaczek
+PRINT Czarnolas buk
