@@ -1,4 +1,4 @@
-##IPP - małe zadanie
+## IPP - małe zadanie
 Po uruchomieniu programu na świecie nie ma żadnego lasu, żadnego drzewa ani żadnego zwierzęcia. Program czyta dane ze standardowego wejścia i wykonuje niżej opisane polecenia. W tych poleceniach parametr las jest nazwą lasu, parametr drzewo jest nazwą drzewa, a parametr zwierzę jest nazwą zwierzęcia. Prawidłowe nazwy są ciągami niebiałych znaków rozszerzonego ASCII o kodach od 33 do 255. Nazwę prawidłowego polecenia i jego parametry oddzielają białe znaki (znaki ' ', '\t', '\v', '\f', '\r' w C o kodach ASCII odpowiednio 32, 9, 11, 12, 13). Każde prawidłowe polecenie pojawia się w osobnym wierszu zakończonym linuksowym znakiem przejścia do nowej linii (znak \n w C, kod ASCII 10). Białe znaki na początku i końcu wiersza należy ignorować.
 
 - `ADD las` – Dodaje las.
