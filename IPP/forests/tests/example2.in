@@ -1,0 +1,11 @@
+# Te polecenia powinny wypisać OK na stdout.
+ADD a b c
+DEL x
+# Te polecenia powinny wypisać ERROR na stderr.
+ADD
+ADD a b c d
+DELETE
+DEL a b c d
+PRINT a b c
+CHECK
+CHECK *
