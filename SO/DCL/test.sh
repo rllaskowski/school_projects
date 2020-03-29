@@ -1,11 +1,18 @@
 make
 
-test=tests/_test_0_2
+echo ""
+for test in tests/*.a
+do
+    echo ${test%.a}
 
-./dcl $(cat ${test}.key) < $test.a > res.out
+    ./dcl $(cat ${test%a}key) < $test > res.out
 
-diff res.out $test.b
-
-# rm res.out
-
-echo ''
+    if diff res.out ${test%a}b > /dev/null
+    then
+        echo "OK!"
+    else
+        echo "BLAD!"
+        exit 1
+    fi
+done
+rm res.out
