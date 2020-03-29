@@ -66,44 +66,45 @@ section .text
     mod         al
 %endmacro
 
+; Wywoluje procedure _create_rev obliczającą permutację odwrotną
+; argumenty:    1 - adres permutacji
+;               2 - adres wynikowej permutacji odwrotnej
 %macro createRev 2
     mov         rax, %1
     mov         rbx, %2
     call        _create_rev
 %endmacro
 
+; Makro zamieniające znak korzystajac z odpowiedniej permutacji
+; argumenty:    1: adres permutacji
+; wejscie:      kod znaku w rax
+; wyjcie:       przepermutowany kod znaku w rax
 %macro perm 1
-    mov         rdx, %1
-    mov         al, [rdx+rax]
+    mov         rdx, %1                 ; kopiuj do rdx adres permutacji
+    mov         al, [rdx+rax]           ; wykonaj odpowiednia permutacje znaku
 %endmacro
 
-%macro checkT 0
-    mov         rcx, PERM_LEN-1
-    xor         rbx, rbx
-    mov         rax, [permT]
-%%check_loop:
-    mov         bl, [rax+rcx]
-    cmp         bl, cl
-    je          _error
-    mov         dl, [rax+rbx]
-    cmp         cl, dl
-    jne         _error
-    loop        %%check_loop
-%endmacro
 
+; Konczy program z sygnalem bledu
 _error:
     exit        1
 
+; Procedura obliczająca permutację odwrotną do danej
+; wejscie:      rax - adres tablicy z permutacja
+;               rbx - adres tablicy wynikowej permutacji 
+; wyjscie:      wynikowa permutacja w tablicy pod rbx
 _create_rev:
-    xor         rdx, rdx
-    mov         rcx, PERM_LEN-1
+    xor         rdx, rdx                ; wartosc rdx bedzie rowna kodowi znaku
+    mov         rcx, PERM_LEN-1         ; ustaw licznik petli do chodzenia po permutacji
 _create_rev_loop:
-    mov         dl, [rax+rcx]
-    mov         [rbx+rdx], cl
-    loop        _create_rev_loop
+    mov         dl, [rax+rcx]           ; wstaw do dl kod znaku z permutacji
+    mov         [rbx+rdx], cl           ; wstaw odpowiedni znak do permutacji odwrotnej
+    loop        _create_rev_loop        ; kontynuuj petle jesli licznik jest wiekszy od 0
     ret
 
-; input - kod znaku w al
+; Sprawdza poprawnosc znaku i zmniejsza jego kod o '1'. Konczy program jesli znak jest niepoprawny
+; wejscie:      al - kod znaku
+; wyjscie       al - zmniejszony o '1' kod znaku 
 _check_sign: 
     cmp         al, '1'+PERM_LEN-1      ; porownaj kod znaku z najwieszym mozliwym
     jg          _error                  ; jesli jest wiekszy niz 'Z' koncze program
@@ -112,31 +113,53 @@ _check_sign:
     sub         al, '1'                 ; wszystkie kody sprowadzam do przedzialu <0, 41>
     ret
 
-;input : rsi string
+; Procedura sprawdzająca poprawność permutacji. Konczy program z sygnalem bledu
+; jesli rozpatrywana permutacja jest niepoprawna
+; wejscie:      rsi - adres tablicy z permutacja
 _check_param:
-    xor         rax, rax                ; potrzebna bedzie dokladna wartosc rejestru
+    xor         rax, rax                ; wartosc calego rax bedzie rowna kodowi znaku
     xor         rcx, rcx                ; zeruj licznik znakow
 _check_param_loop:
-    mov         al, [rsi]               ; aktualny znak
+    mov         al, [rsi]               ; wstaw do al kod znaku
     test        al, al                  ; czy aktualny znak to '\0'?
     jz          _check_param_end        ; jesli tak zakoncz petle
     call        _check_sign             ; sprawdz poprawnosc znaku
-    mov         [rsi], al               ; wstaw do tablicy zmniejszony kod znaku
+    mov         [rsi], al               ; wstaw spowrotem do bss zmniejszony kod znaku
     cmp         bl, PERM_LEN            ; czy sprawdzamy aktualnie permutacje?
     jne         _no_perm                ; jesli nie - nie sprawdzamy ilosci wystepowan znakow
     cmp         bl, [occur+rax]         ; porownaj iloc wystepowan znaku z oczekiwana iloscia
     jne         _error                  ; zakoncz program jesli znak wystepuje zla ilosc razy
 _no_perm:
-    mov         [occur+rax], dl         ; wstaw nowa ilosc wystepowan
-    inc         rsi                     ; przesun wskaznik na kolejna litere
-    inc         rcx                     ; zwiekszony licznik znakow
-    jmp         _check_param_loop
+    mov         [occur+rax], dl         ; wstaw do bss nowa ilosc wystepowan znaku - dana w dl
+    inc         rsi                     ; przesun wskaznik na kolejny znak 
+    inc         rcx                     ; zwieksz licznik znakow
+    jmp         _check_param_loop       ; kontynuuj sprawdzanie parametru
 _check_param_end:
     cmp         cl, bh                  ; porownaj z oczekiwana dlugoscia parametru
     jne         _error                  ; zakoncz jesli dlugosc jest inna
     ret
 
-; input  kod znaku w al
+; Procedura sprawdzajaca poprawnosc permutacji T
+; konczy program z sygnalem bledu jesli permutacja jest niepoprawna
+_check_t:
+    mov         rcx, PERM_LEN-1         ; ustaw licznik petli do chodzenia po permutacji
+    xor         rbx, rbx                ; wartosc rbx bedzie rowna kodowi znaku
+    mov         rax, [permT]            ; kopiuj adres permutacji
+_check_t_loop:
+    mov         bl, [rax+rcx]           ; kopiuj do bl kod znaku
+    cmp         bl, cl                  ; porownaj z pozycja w permutacji
+    je          _error                  ; punkt staly permutacji T? blad 
+    mov         dl, [rax+rbx]           ; znak odpowiadajacy atualnemu w dwuelementowym cyklu
+    cmp         cl, dl                  ; czy ten znak jest rowny aktulnej pozycji?
+    jne         _error                  ; nie? znaleziono cykl o dlugosci innej niz 2 - blad
+    loop        _check_t_loop            ; kontunuuj petle jesli licznik jest wiekszy od 0
+    
+    ret
+
+
+; Procedura zamieniająca znak korzystając ze złożenia permutacji
+; wejscie:      kod znaku w rax
+; wyjscie       przepermutowany kod znaku w rax 
 _parse_sign:
     inc         bl                      ; zwieksz pozycje bębenka r
     cmp         bl, 'L'-'1'             ; czy r jest na L?
@@ -153,7 +176,7 @@ _no_turn:
     mod         bh                      ; moduluj przez mozliwa ilosc znakow kod bebenka l
 
     permQ       bl                      ; wykonaj perm Q_r
-    perm        [permR]                 ; wykoanj perm R
+    perm        [permR]                 ; wykonaj perm R
     permQRev    bl                      ; wykonaj perm -Q_r
     permQ       bh                      ; wykonaj perm Q_l
     perm        [permL]                 ; wykonaj perm L
@@ -184,15 +207,15 @@ _start:
     checkParam  [permR], 1, 2, PERM_LEN ; sprawdz poprawnosc permutacji R
     checkParam  [permT], 2, 3, PERM_LEN ; sprawdz poprawnosc permutacji T
     checkParam  [key], 0, 0, 2          ; sprawdz poprawnosc klucza
-    checkT
+    
+    call        _check_t
+
     createRev   [permL], permRevL       ; tworz odwrotnosc perm L
     createRev   [permR], permRevR       ; tworz odwrotnosc perm R
 
-    mov         rax, [key]              ; kopiuj poczatkowe wartosci
-    mov         bx, [rax]               ; bebenkow
+    mov         rax, [key]              ; kopiuj do bss poczatkowe
+    mov         bx, [rax]               ; wartosci bebenkow
     mov         [l], bx                 ; l i r (są obok siebie w pamięci)
-
-    ;printNumber rbx
 _input_loop:
     mov         rax, SYS_READ           ; ustaw do wywołania funkcję sys_read
     mov         rdi, STDIN              ; korzystaj ze standardowego wejscia
@@ -204,23 +227,23 @@ _input_loop:
     jz          _input_end              ; skoncz wczytywanie
 
     push        rax                     ; ilosc wczytanych znakow przyda sie pozniej
-    xor         rcx, rcx
+    xor         rcx, rcx                ; inicjalizuj licznik petli
     mov         bx, [l]                 ; kopiujemy wartosci kluczy do rejestrow bh, bl
 _check_loop:
-    mov         al, [buffer+rcx]        ; kopiuj aktualny znak    
-    call        _check_sign             ; czy rozpatrywany znak jest poprawny?
-    push        rcx
+    mov         al, [buffer+rcx]        ; kopiuj aktualny znak z bufora
+    call        _check_sign             ; czy rozpatrywany znak jest poprawny? 
+    push        rcx                     ; _parse_sign korzysta z rcx - wrzuc go na stos
     call        _parse_sign             ; koduj znak
-    pop         rcx
+    pop         rcx                     ; zabierz spowrotem rcx
     mov         [buffer+rcx], al        ; wstaw zakodowany znak do bufora
-    inc         rcx                     ; zwieksz wskaznik na znak
-    cmp         rcx, [rsp]              ; czy zostaly przejrzane wszystkie znaki?
+    inc         rcx                     ; zwieksz licznik petli
+    cmp         rcx, [rsp]              ; czy zostaly przejrzane wszystkie znaki? na gorze stosu jest liczba wczytanych znakow
     jne          _check_loop            ; jesli nie kontynuuj parsowanie bufora
     mov         [l], bx                 ; wstaw spowrotem do pamieci klucze
 
     mov         rax, SYS_WRITE          ; ustaw do wywołania funkcję sys_write
     mov         rdi, STDOUT             ; korzystaj ze standarowego wyjścia
-    pop         rdx                     ; zdejmij ze stosu ilość wpisanych wczesniej znaków
+    pop         rdx                     ; ustaw ilosc znakow do wypisania na ilosc wczytanych wczesniej znakow
     mov         rsi, buffer             ; wypisuj z bufora
     syscall                             ; wywołaj funkcję systemową
 
