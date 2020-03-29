@@ -1,6 +1,7 @@
 make
 
-echo ""
+echo 
+
 for test in tests/*.a
 do
     echo ${test%.a}
