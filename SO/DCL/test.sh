@@ -12,8 +12,13 @@ do
     then
         echo "OK!"
     else
-        echo "BLAD!"
+        echo "ERROR!"
         exit 1
     fi
 done
+
+
+echo
+size dcl.o
+
 rm res.out
