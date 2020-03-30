@@ -22,11 +22,6 @@ permT           resb 8
 
 section .text
 
-%macro checkSign 1
-    mov         al, %1
-    call        _check_sign
-%endmacro
-
 ; Makro wywołujące procedurę _check_param
 ; argumenty:    %1 - adres w pamieci wskazujacy na parametr
 ;               %2 - oczekiwana wartosc occur[x] dla znaku z kodem x przed wywolaniem procedury 
