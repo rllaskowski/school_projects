@@ -88,6 +88,11 @@ _no_end_loop:
 
         ret
 
+; Oblicza 8 cyfr w systemie 16tkowym na pozycji 8*pixd. Zwieksza wartosc
+; https://math.stackexchange.com/questions/880904/how-do-you-use-the-bbp-formula-to-calculate-the-nth-digit-of-%CF%80
+; input:        rdi - &pix - adres tablicy do wstawienia wyniku
+;               rsi - &pixd - adres zmiennej z indeksem w tablicy do wstawienia wyniku
+;               rdx - max - maksymalna wartosc pixd
 pix:
         push        r12                     ; Zachowaj rejestr r12
         push        r13                     ; Zachowaj rejestr r13
@@ -130,7 +135,7 @@ pix:
 
         shr         r13, 32                 ; Wynikowe 8 cyfr znajduje sie w najstarszych 32 bitach
         mov         [rdi], r13d             ; Wstaw do pamieci wynikowe 8 cyfr rozwiniecia pi
-
+ 
 _end:
         pop         r13                     ; Przywroc rejrestr r12
         pop         r12                     ; Przywroc rejestr r13
