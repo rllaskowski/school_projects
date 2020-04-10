@@ -65,24 +65,26 @@ int main(int argc, char *argv[])
   for (i = 0; i < n; i++) {
     generate_rand_bytes(k, msg);
     msg[k] = '\0';
-    buffer[k] = '\0';
     printf("writing to socket %d bytes\n", k);
     if (write(sock, msg, k) != k) {
       syserr("partial / failed write");
     }
 
-    memset(buffer, 0, sizeof(buffer));
-    rcv_len = read(sock, buffer, sizeof(buffer) - 1);
-    if (rcv_len < 0) {
-      syserr("read");
-    }
-    printf("read from socket: %zd bytes\n", rcv_len);
+    unsigned rcv_sum = 0;
+    while (rcv_sum < k) {
+      memset(buffer, 0, sizeof(buffer));
 
-    if (strcmp(msg, buffer) != 0) {
-      printf("Received data is not equalt sent data\n");
+      rcv_len = read(sock, buffer, sizeof(buffer) - 1);
+      if (rcv_len < 0) {
+        syserr("read");
+      }
+      rcv_sum += rcv_len;
+      printf("read from socket: %zd bytes\n", rcv_len);
     }
   }
-
+  printf("wyszedlem\n");
+  sleep(5);
+  printf("wyszedlem2\n");
 
   (void) close(sock); // socket would be closed anyway when the program ends
 

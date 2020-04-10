@@ -7,10 +7,9 @@
 
 #include "err.h"
 
-#define BUFFER_SIZE   100000
+#define BUFFER_SIZE   100001
 #define QUEUE_LENGTH     5
 #define PORT_NUM     10001
-#define FILENAME_MAX_LEN 100
 
 int main(int argc, char *argv[])
 {
@@ -56,7 +55,7 @@ int main(int argc, char *argv[])
     do {
       len = read(msg_sock, buffer, sizeof(buffer));
       if (len < 0)
-        syserr("reading from client socket");
+        syserr("reading from client sockete");
       else {
         printf("read from socket: %zd\n", len);
         if (argc == 2) {
