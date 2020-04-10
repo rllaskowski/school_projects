@@ -50,7 +50,7 @@ section .text
 ; https://math.stackexchange.com/questions/880904/how-do-you-use-the-bbp-formula-to-calculate-the-nth-digit-of-%CF%80
 ; input:        r9  - j
 ;               r10 - n 
-; output:       r8 - 8 pierwszych cyfr cżesci ulamkowej sumy S_j             
+; output:       r8 - 8 pierwszych cyfr {S_j}          
 _compute_frac: 
         xor         r8d, r8d            ; Na poczatku suma = 0
         xor         esi, esi            ; na poczatku k = 0
@@ -83,7 +83,7 @@ _no_end_loop:
         add         r9, 8               ; Zwieksz wartosc (8*k+j)
 
             
-        test        rax, rax            ; Czy ilorazy sa juz nie
+        test        rax, rax            ; Czy iloraz jest jeszcze istotny?
         jnz         _no_end_loop
 
         ret
@@ -94,26 +94,24 @@ _no_end_loop:
 ;               rsi - &pixd - adres zmiennej z indeksem w tablicy do wstawienia wyniku
 ;               rdx - max - maksymalna wartosc pixd
 pix:
-        push        r12                     ; Zachowaj rejestr r12
-        push        r13                     ; Zachowaj rejestr r13
-        push        rdx                     ; Zachowaj wartosc 3 argumentu
-        push        rsi                     ; Zachowaj wartoc 2 argumentu
-        push        rdi                     ; Zachowaj wartosc 1 argumentu
-
+        push        r12                     ; Zachowaj rejestr r12 -- konwencja ABI
+        push        r13                     ; Zachowaj rejestr r13 -- konwencja ABI
+        push        r14                     ; Zachowaj rejestr r14 -- konwencja ABI
+        push        r15                     ; Zachowaj rejestr r15 -- konwencja ABI
+        mov         r14, rsi                ; Zachowaj &pixd
+        mov         r15, rdx                ; Zachowaj wartosc max 
+        push        rdi                     ; Zachowaj &ppi
         call_pixtime
-
-        pop         rdi                     ; Odzyskaj wartosc 1 argumentu
-        pop         rsi                     ; Odzyskaj wartoc 2 argumentu
-        pop         rdx                     ; Odzyskaj wartosc 3 argumentu
-
+        pop         rdi                     ; Przywroc &ppi
+      
+_loop:
         mov         r10, 1                  ; Wartosc pidx zostanie zwiekszona o 1
-        lock        xadd QWORD[rsi], r10    ; Pobierz z pamieci oraz zwieksz atomowo o 1 pidx
+        lock        xadd QWORD[r14], r10    ; Pobierz z pamieci oraz zwieksz atomowo o 1 pidx
 
-        cmp         r10, rdx                ; Jeśli pobrane pidx jest wieksze od maksymalnej dozwolonej wartosci(max)
+        cmp         r10, r15                ; Jeśli pobrane pidx jest wieksze od maksymalnej dozwolonej wartosci(max)
         jg          _end                    ; Przejdź do konca programu
 
-        lea         rdi, [rdi+4*r10]        ; Przesun wskaźnik na odpowiednie miejsce w tablicy
-        lea         r10, [r10*8]            ; n = 8*pidx 
+        shl         r10, 3                  ; n = 8*m
 
         mov         r9d, 1                  ; j = 1
         call        _compute_frac           ; Oblicz S_1
@@ -134,16 +132,19 @@ pix:
         sub         r13, r8                 ; Odejmuj od wyniku S_6
 
         shr         r13, 32                 ; Wynikowe 8 cyfr znajduje sie w najstarszych 32 bitach
-        mov         [rdi], r13d             ; Wstaw do pamieci wynikowe 8 cyfr rozwiniecia pi
- 
+
+        shr         r10, 3                  ; m = 1/8 *n
+        mov         DWORD[rdi+4*r10], r13d  ; Wstaw do pamieci wynikowe 8 cyfr rozwiniecia pi
+
+        jmp         _loop                   ; Licz dalej
 _end:
-        pop         r13                     ; Przywroc rejrestr r12
-        pop         r12                     ; Przywroc rejestr r13
-
+        pop         r15                     ; Przywroc rejestr r14 -- konwencja ABI
+        pop         r14                     ; Przywroc rejestr r15 -- konwencja ABI
+        pop         r13                     ; Przywroc rejestr r12 -- konwencja ABI
+        pop         r12                     ; Przywroc rejestr r13 -- konwencja ABI
+      
         sub         rsp, 8                  ; Przed wejsciem do funkcji stos ma byc przesuniety o 16k+8
-
         call_pixtime
-
         add         rsp, 8                  ; Przywroc wskaznik stosu
 
         ret
