@@ -55,7 +55,7 @@ int main(int argc, char *argv[])
     do {
       len = read(msg_sock, buffer, sizeof(buffer));
       if (len < 0)
-        syserr("reading from client sockete");
+        syserr("reading from client socket");
       else {
         printf("read from socket: %zd\n", len);
         if (argc == 2) {

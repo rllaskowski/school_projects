@@ -82,9 +82,6 @@ int main(int argc, char *argv[])
       printf("read from socket: %zd bytes\n", rcv_len);
     }
   }
-  printf("wyszedlem\n");
-  sleep(5);
-  printf("wyszedlem2\n");
 
   (void) close(sock); // socket would be closed anyway when the program ends
 
