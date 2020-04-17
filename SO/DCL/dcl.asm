@@ -6,16 +6,16 @@ STDIN           equ 0
 STDOUT          equ 1
 STDERR          equ 2
 
-BUFF_LEN        equ 4096
+BUFF_LEN        equ 4095
 PERM_LEN        equ 42
 
 global _start
 
 section .bss
 buffer          resb BUFF_LEN+1
-occur           resb PERM_LEN
-permRevL        resb PERM_LEN
-permRevR        resb PERM_LEN
+occur           resb PERM_LEN+6
+permRevL        resb PERM_LEN+6
+permRevR        resb PERM_LEN+6
 permL           resb 8
 permR           resb 8
 permT           resb 8
