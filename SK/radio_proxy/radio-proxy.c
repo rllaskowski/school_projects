@@ -18,15 +18,15 @@
 #include <poll.h>
 #include <sys/time.h>
 #include <signal.h>
+#include <errno.h>
 
 #include "err.h"
 #include "utils.h"
 
-#define BSIZE 10000 /**< size of buffer for socket reading */
-#define TIMEOUT 5000 /**< default timeout parameter */
-#define MAX_CLIENTS 20
-#define MAX_RESLEN 100
-#define MAX_HOSTLEN 100
+#define BSIZE 10000
+#define TIMEOUT 5000
+#define MAX_CLIENTS 10
+#define MAX_ARGLEN 300
 
 #define MSG_DISCOVER 1
 #define MSG_IAM 2
@@ -34,7 +34,16 @@
 #define MSG_AUDIO 4
 #define MSG_META 5
 
-/** Parsing states of ICY Shoutcast response */
+#define USAGE_STR \
+"usage:\n"\
+"-h <host> (required)\n"\
+"-p <port> (required)\n"\
+"-r <resource> (default '/')\n"\
+"-m <yes | no> (default 'yes')\n"\
+"-t <timeout> (default 5)\n" \
+"-P <port> (required to start proxy mode)\n"\
+"-T <timeout> (default 5 in proxy mode)\n"\
+
 enum parser_state {
 	HEAD,
 	AUDIO,
@@ -42,7 +51,6 @@ enum parser_state {
 	META
 };
 
-/** HTTP response meta info */
 struct http_head {
 	char *status;
 	unsigned metaint;
@@ -50,7 +58,6 @@ struct http_head {
 	size_t len;
 };
 
-/** Program parameters */
 struct parameters {
 	char *i_host;
 	char *i_resource;
@@ -58,24 +65,21 @@ struct parameters {
 	char *i_port;
 	bool i_meta;
 	unsigned p_port;
-	char *p_address;
 	unsigned p_timeout;
+	bool proxy;
 };
 
-/** Current parser state */
 struct parser {
 	unsigned block_left;
 	enum parser_state state;
 	struct http_head head;
 };
 
-/** Client info */
 struct client {
 	struct sockaddr_in address;
 	int64_t ack_time;
 };
 
-/** Radio proxy data */
 struct proxy {
 	struct client clients[MAX_CLIENTS];
 	int sock;
@@ -85,7 +89,7 @@ struct proxy {
 
 static bool finish = false;
 
-static void catch_int (int sig) {
+static void catch_int() {
 	finish = true;
 }
 
@@ -112,13 +116,17 @@ static int parse_params(
 	/* setting default parameters */
 	params->i_meta = false;
 	params->i_timeout = TIMEOUT;
-	params->p_address = NULL;
 	params->p_timeout = TIMEOUT;
+	params->proxy = false;
 	int opt;
 
 	while ((opt = getopt(argc, argv, "h:r:t:p:m:P:T:")) != -1) {
 		if (!optarg) {
 			return -1;
+		}
+		/* check for future safety */
+		if (strnlen(optarg, MAX_ARGLEN) >= MAX_ARGLEN) {
+			fatal("too long option argument");
 		}
 
 		switch (opt) {
@@ -132,7 +140,8 @@ static int parse_params(
 				params->i_port = optarg;
 				break;
 			case 't':
-				if (!parse_ui(optarg, &(params->i_timeout))) {
+				if (!parse_ui(optarg, &(params->i_timeout)) ||
+					params->i_timeout == 0) {
 					return -1;
 				}
 				params->i_timeout *= 1000;
@@ -150,12 +159,11 @@ static int parse_params(
 				if (!parse_ui(optarg, &(params->p_port))) {
 					return -1;
 				}
-				break;
-			case 'B':
-				params->p_address = optarg;
+				params->proxy = true;
 				break;
 			case 'T':
-				if (!parse_ui(optarg, &(params->p_timeout))) {
+				if (!parse_ui(optarg, &(params->p_timeout)) ||
+					params->p_timeout == 0) {
 					return -1;
 				}
 				params->p_timeout *= 1000;
@@ -182,10 +190,8 @@ static int get_isocket(char *host, char *port) {
 	addr_hints.ai_socktype = SOCK_STREAM;
 	addr_hints.ai_protocol = IPPROTO_TCP;
 
-	size_t err = getaddrinfo(host, port, &addr_hints, &addr_result);
-
-	if (err != 0) {
-		syserr("Obtaining address info");
+	if (getaddrinfo(host, port, &addr_hints, &addr_result) != 0) {
+		syserr("obtaining address info");
 	}
 
 	int sock = socket(addr_result->ai_family,
@@ -208,34 +214,37 @@ static int get_psocket(struct parameters *params) {
 
 	sock = socket(AF_INET, SOCK_DGRAM, 0);
 	if (sock < 0) {
-		syserr("Creating UDP socket");
+		syserr("creating UDP socket");
 	}
 
+	memset(&server_address, 0, sizeof(server_address));
 	server_address.sin_family = AF_INET;
 	server_address.sin_addr.s_addr = htonl(INADDR_ANY);
 	server_address.sin_port = htons(params->p_port);
 
 	if (bind(sock, (struct sockaddr *) &server_address,
 			 (socklen_t) sizeof(server_address)) < 0) {
-		syserr("Binding");
+		syserr("binding");
 	}
 
 	return sock;
 }
 
-static size_t create_request(struct parameters *params, char **request) {
+static size_t create_request(
+		struct parameters *params,
+		char **request) {
 	static const char *format = "GET %s HTTP/1.0\r\n"
 								"Host: %s\r\n"
 								"Accept: */*\r\n"
 								"Icy-MetaData: %d\r\n"
 								"Connection: close\r\n"
 								"\r\n";
-	size_t r_len = strlen(format)+strnlen(params->i_host, MAX_RESLEN)+
-			strnlen(params->i_resource, MAX_HOSTLEN);
+	size_t r_len = strlen(format)+strlen(params->i_host)+
+			strlen(params->i_resource);
 
 	(*request) = calloc(r_len, sizeof(char));
 	if (!(*request)) {
-		syserr("Allocating request string memory");
+		syserr("allocating request string memory");
 	}
 	snprintf((*request), r_len, format, params->i_resource,
 			params->i_host, params->i_meta);
@@ -249,7 +258,7 @@ static int parse_httphead(
 		struct http_head *h) {
 	h->data = realloc(h->data, h->len+(*buff_len)+1);
 	if (!h->data) {
-		syserr("Allocating head data memory");
+		syserr("allocating head data memory");
 	}
 	memcpy(h->data+h->len, (*buff), (*buff_len));
 
@@ -266,9 +275,9 @@ static int parse_httphead(
 	/* whole response head has been read */
 	*(h_end+2) = 0;
 	str_lower(h->data);
-#ifdef DEBUG
-	fprintf(stderr, "%.*s", (int)(h_end+4-h->data), h->data);
-#endif
+
+	logd( "%.*s", (int)(h_end+4-h->data), h->data);
+
 	char *stl_end = strstr(h->data, "\r\n");
 
 	(*stl_end) = 0; /* separate status line from headers */
@@ -301,9 +310,9 @@ static int parse_httphead(
 	(*buff_len) -= buff_used;
 
 	free(h->data);
+
 	return 0;
 }
-
 
 static void send_data(
 		char *data,
@@ -324,7 +333,6 @@ static void send_data(
 		}
 	}
 }
-
 
 static int parse_data(
 		char *data,
@@ -360,9 +368,10 @@ static int parse_data(
 		data_left -= block;
 
 		if (parser->state == META) {
-			if (!proxy) {
-				fprintf(stderr, "%.*s", (int)block, data);
+			if (proxy->sock < 0) {
+				fwrite(data, sizeof(char), block, stderr);
 			} else {
+				logd("metadata: %.*s", block, data);
 				send_data(data, block, MSG_META, proxy);
 			}
 
@@ -371,7 +380,7 @@ static int parse_data(
 				parser->block_left = parser->head.metaint;
 			}
 		} else if (parser->state == AUDIO) {
-			if (!proxy) {
+			if (proxy->sock < 0) {
 				fwrite(data, sizeof(char), block, stdout);
 			} else {
 				send_data(data, block, MSG_AUDIO, proxy);
@@ -394,6 +403,7 @@ static int parse_data(
 		}
 		data += block;
 	}
+
 	return 0;
 }
 
@@ -408,8 +418,8 @@ static struct client * find_client(
 			proxy->time-client->ack_time <= proxy->timeout) {
 			return client;
 		}
-
 	}
+
 	return NULL;
 }
 
@@ -426,16 +436,48 @@ static struct client * find_slot(
 	return NULL;
 }
 
-static int insert_client(
+static struct client * insert_client(
+		struct sockaddr_in *addr,
+		struct proxy *proxy) {
+	struct client *slot = find_slot(proxy);
+	if (slot) {
+		memcpy(&slot->address, addr, sizeof(slot->address));
+		slot->ack_time = proxy->time;
+
+		return slot;
+	}
+	return NULL;
+}
+
+static void send_greeting(
+		struct client *client,
+		char *buffer,
 		struct proxy *proxy,
-		struct sockaddr_in addr) {
+		struct parameters *params) {
+	char *format = "Host='%s';Port='%s';Resource='%s';Timeout='%u';";
+	sprintf(buffer+4,format,
+			params->i_host, params->i_port,
+			params->i_resource, params->p_timeout/1000);
+
+	uint16_t msg_type = MSG_IAM;
+	memcpy(buffer, &msg_type, 2);
+
+	uint16_t msg_len = strlen(buffer+4);
+	memcpy(buffer+2, &msg_len, 2);
+
+	socklen_t snda_len = (socklen_t) sizeof(client->address);
+
+	sendto(proxy->sock, buffer, msg_len+1+4, 0,
+		   (struct sockaddr *) &client->address, snda_len);
 
 }
 
 static void handle_msg(
 		struct proxy *proxy,
 		struct sockaddr_in *addr,
-		uint16_t msg_type) {
+		uint16_t msg_type,
+		char *buffer,
+		struct parameters *params) {
 	if (msg_type != MSG_ALIVE && msg_type != MSG_DISCOVER) {
 		return;
 	}
@@ -443,13 +485,16 @@ static void handle_msg(
 	struct client *client = find_client(proxy, addr);
 
 	if (!client && msg_type == MSG_DISCOVER) {
-		struct client *slot = find_slot(proxy);
+		client = insert_client(addr, proxy);
 
-		if (slot) {
-			memcpy(&slot->address, addr, sizeof(slot->address));
-			slot->ack_time = proxy->time;
+		if (client) {
+			logd("new client at slot %ld", client-proxy->clients);
+			send_greeting(client, buffer, proxy, params);
 		}
 	} else if (client) {
+		logd("client %d - ACK diff: %ld",
+				client-proxy->clients,
+				proxy->time-client->ack_time);
 		client->ack_time = proxy->time;
 	}
 }
@@ -458,7 +503,7 @@ static void proxy_work(
 		int i_sock,
 		int p_sock,
 		struct parameters *params) {
-	int evt, rcv;
+	int evt = 0, rcv = 0;
 	socklen_t rcva_len;
 	struct pollfd fds[2];
 	struct sockaddr_in client_addr;
@@ -503,30 +548,47 @@ static void proxy_work(
 		proxy.time = to_msec(&time);
 
 		if (fds[1].revents & POLLIN) {
+			fds[1].revents = 0;
 			rcva_len = (socklen_t) sizeof(client_addr);
 
-			rcv = recvfrom(fds[1].fd, buffer, 4,
-					0, (struct sockaddr*)&client_addr,&rcva_len);
+			rcv = recvfrom(fds[1].fd, buffer, 4,0,
+					(struct sockaddr*)&client_addr, &rcva_len);
+
+			if (rcv < 0) {
+				break;
+			}
 
 			if (rcv >= 2) {
 				memcpy(&msg_type, buffer, 2);
-				handle_msg(&proxy, &client_addr, msg_type);
+				handle_msg(&proxy, &client_addr, msg_type,
+						buffer, params);
 			}
 		}
 
 		if (fds[0].revents & POLLIN) {
+			fds[0].revents = 0;
 			ack_time = proxy.time;
 
-			/* leave at least 4 bytes at the beginning for msg header */
+			/* leave at least 4 bytes
+			 * at the beginning of buffer for msg header */
 			rcv = read(fds[0].fd, buffer+4, BSIZE);
 			if (rcv <= 0) {
 				break;
 			}
-			if (p_sock == -1) {
-				parse_data(buffer+4, rcv, params, &parser, NULL);
-			} else {
-				parse_data(buffer+4, rcv, params, &parser, &proxy);
+
+			if (parse_data(buffer+4, rcv,
+					params, &parser, &proxy) < 0) {
+				fatal("parsing response");
 			}
+		}
+	}
+	if (errno != EINTR) {
+		if (rcv < 0) {
+			syserr("reading from socket");
+		}
+
+		if (evt < 0) {
+			syserr("poll fail");
 		}
 	}
 }
@@ -536,8 +598,8 @@ int main(int argc, char *argv[]) {
 	int i_sock, p_sock;
 
 	if (parse_params(argc, argv, &params) < 0) {
-		printf("usage: \n");
-		return 0;
+		fprintf(stderr, USAGE_STR);
+		return 1;
 	}
 
 	i_sock = get_isocket(params.i_host, params.i_port);
@@ -546,27 +608,30 @@ int main(int argc, char *argv[]) {
 	size_t r_len = create_request(&params, &request);
 
 	int sent = write(i_sock, request, r_len);
-	if (sent != r_len) {
-		free(request);
-		syserr("Sending request");
-	}
 	free(request);
 
-	if (params.p_port) {
+	if (sent != (int)r_len) {
+		syserr("sending request");
+	}
+
+	if (params.proxy) {
 		p_sock = get_psocket(&params);
 	} else {
 		p_sock = -1;
 	}
 
 	set_sighandler();
-
 	proxy_work(i_sock, p_sock, &params);
 
-
-	close(i_sock);
+	if(close(i_sock) < 0) {
+		syserr("closing TCP socket");
+	}
 
 	if (p_sock != -1) {
-		close(p_sock);
+		if (close(p_sock) < 0) {
+			syserr("closing UDP socket");
+		}
 	}
+
 	return 0;
 }

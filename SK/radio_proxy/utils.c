@@ -12,6 +12,10 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <ctype.h>
+#include <stdio.h>
+#include <stdarg.h>
+
+#include "utils.h"
 
 uint32_t min(uint32_t a, uint32_t b) {
 	if (a < b) {
@@ -49,4 +53,14 @@ void str_lower(char *str) {
 
 int64_t to_msec(struct timeval *t) {
 	return (int64_t)t->tv_sec*1000+t->tv_usec/1000;
+}
+
+void logd(const char *fmt, ...) {
+#ifdef DEBUG
+	va_list fmt_args;
+	va_start(fmt_args, fmt);
+	vfprintf(stderr, fmt, fmt_args);
+	va_end(fmt_args);
+	fprintf(stderr, "\n");
+#endif
 }

@@ -10,6 +10,8 @@
 #ifndef _UTILS_H_
 #define _UTILS_H_
 
+// #define DEBUG
+
 uint32_t min(uint32_t a, uint32_t b);
 
 bool parse_ui(char *ui_str, unsigned *res);
@@ -17,5 +19,7 @@ bool parse_ui(char *ui_str, unsigned *res);
 void str_lower(char *str);
 
 int64_t to_msec(struct timeval *t);
+
+void logd(const char *fmt, ...);
 
 #endif	/* _UTILS_H_ */

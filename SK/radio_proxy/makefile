@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -Wall
+CFLAGS = -Wall -Wextra -O2
 TARGETS = radio-proxy
 
 all: $(TARGETS) 
