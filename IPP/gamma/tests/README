@@ -1,0 +1,13 @@
+# Testy trybu wsadowego
+
+Testy, które są w plikach z rozszerzeniem .in12, są dwuwariantowe: akceptowane
+wyjście programu jest plikach .out oraz .err1 i .err2 lub w parach plików
+.out1, .err1 i .out2, .err2.
+
+Limit czasu na każdy test wynosi 2 sekundy (na maszynach red).
+
+# Testy trybu interaktywnego
+
+cat broken.input | timeout 2s PATH/gamma
+
+Napis PATH to ścieżka do miejsca, gdzie znajduje się plik wykonywalny gamma.

@@ -1,0 +1,111 @@
+# zła liczba parametrów
+I
+B
+I 1
+B 1
+I 1 1
+B 1 1
+I 1 1 1
+B 1 1 1
+I 1 1 1 1 1
+B 1 1 1 1 1
+
+# parametr o złej wartości
+I -1 1 1 1
+B -1 1 1 1
+I 1 -1 1 1
+B 1 -1 1 1
+I 1 1 -1 1
+B 1 1 -1 1
+I 1 1 1 -1
+B 1 1 1 -1
+I -2147483640 1 1 1
+B -2147483640 1 1 1
+I 1 -2147483640 1 1
+B 1 -2147483640 1 1
+I 1 1 -2147483640 1
+B 1 1 -2147483640 1
+I 1 1 1 -2147483640
+B 1 1 1 -2147483640
+I 4294967296 1 1 1
+B 4294967296 1 1 1
+I 1 4294967296 1 1
+B 1 4294967296 1 1
+I 1 1 4294967296 1
+B 1 1 4294967296 1
+I 1 1 1 4294967296
+B 1 1 1 4294967296
+I 9999999999 1 1 1
+B 9999999999 1 1 1
+I 1 9999999999 1 1
+B 1 9999999999 1 1
+I 1 1 9999999999 1
+B 1 1 9999999999 1
+I 1 1 1 9999999999
+B 1 1 1 9999999999
+
+# parametr niebędący liczbą
+I a 1 1 1
+B b 1 1 1
+I 1c 1 1 1
+B 1d 1 1 1
+
+I 1 A 1 1
+B 1 B 1 1
+I 1 1C 1 1
+B 1 1D 1 1
+
+I 1 1 < 1
+B 1 1 > 1
+I 1 1 1= 1
+B 1 1 1? 1
+
+I 1 1 1 p
+B 1 1 1 q
+I 1 1 1 1r
+B 1 1 1 1s
+
+I 1 1 1 1 x
+B 1 1 1 1 y
+
+# parametr nieakceptowalny przez gamma_new
+I 0 2 2 2
+B 0 2 2 2
+I 2 0 2 2
+B 2 0 2 2
+I 2 2 0 2
+B 2 2 0 2
+I 2 2 2 0
+B 2 2 2 0
+
+# niepoprawne polecenie przed wejściem w tryb wsadowy lub interaktywny
+m 1 1 1
+g 1 1 1
+b 1
+f 1
+q 1
+p
+x
+
+# przejście do trybu wsadowego
+B 4 4 2 3
+
+# jakaś prosta gra
+m 1 2 2
+g 1 3 3
+b 1
+f 1
+q 1
+p
+
+# kilka błędów
+m 1
+g 1
+b
+f
+q
+p 1
+
+# zmiana trybu niemożliwa
+I 4 4 2 3
+B 4 4 2 3
